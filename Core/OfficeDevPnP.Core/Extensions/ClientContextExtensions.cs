@@ -12,6 +12,7 @@ using System.Configuration;
 using System.Threading.Tasks;
 using System.Net.Http;
 using Newtonsoft.Json;
+using System.IdentityModel.Tokens.Jwt;
 
 #if !ONPREMISES
 using OfficeDevPnP.Core.Sites;
@@ -229,12 +230,35 @@ namespace Microsoft.SharePoint.Client
         /// <returns>True if app-only, false otherwise</returns>
         public static bool IsAppOnly(this ClientRuntimeContext clientContext)
         {
-            if (clientContext.Credentials == null)
+            // Set initial result to false
+            var result = false;
+
+            // Try to get an access token from the current context
+            var accessToken = clientContext.GetAccessToken();
+
+            // If any
+            if (!String.IsNullOrEmpty(accessToken))
             {
-                return true;
+                // Try to decode the access token
+                JwtSecurityTokenHandler jwtHandler = new JwtSecurityTokenHandler();
+                if (jwtHandler.CanReadToken(accessToken))
+                {
+                    var token = jwtHandler.ReadToken(accessToken) as JwtSecurityToken;
+
+                    // Search for the UPN claim, to see if we have user's delegation
+                    var upn = token.Claims.FirstOrDefault(claim => claim.Type == "upn")?.Value;
+                    if (String.IsNullOrEmpty(upn))
+                    {
+                        result = true;
+                    }
+                }
+            }
+            else if (clientContext.Credentials == null)
+            {
+                result = true;
             }
 
-            return false;
+            return (result);
         }
 
         /// <summary>
@@ -450,6 +474,17 @@ namespace Microsoft.SharePoint.Client
         public static async Task<ClientContext> CreateSiteAsync(this ClientContext clientContext, TeamSiteCollectionCreationInformation siteCollectionCreationInformation)
         {
             return await SiteCollection.CreateAsync(clientContext, siteCollectionCreationInformation);
+        }
+
+        /// <summary>
+        /// BETA: Groupifies a classic Team Site Collection
+        /// </summary>
+        /// <param name="clientContext">ClientContext instance of the site to be groupified</param>
+        /// <param name="siteCollectionGroupifyInformation">Information needed to groupify this site</param>
+        /// <returns>The clientcontext of the groupified site</returns>
+        public static async Task<ClientContext> GroupifySiteAsync(this ClientContext clientContext, TeamSiteCollectionGroupifyInformation siteCollectionGroupifyInformation)
+        {
+            return await SiteCollection.GroupifyAsync(clientContext, siteCollectionGroupifyInformation);
         }
 #endif
     }

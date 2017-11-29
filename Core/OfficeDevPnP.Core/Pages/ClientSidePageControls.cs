@@ -213,15 +213,12 @@ namespace OfficeDevPnP.Core.Pages
                 throw new ArgumentNullException("ControlDataJson cannot be null");
             }
 
-            // Decode the html encoded string
-            var decoded = WebUtility.HtmlDecode(controlDataJson);
-
             // Deserialize the json string
             var jsonSerializerSettings = new JsonSerializerSettings()
             {
                 MissingMemberHandling = MissingMemberHandling.Ignore
             };
-            var controlData = JsonConvert.DeserializeObject<ClientSideCanvasControlData>(decoded, jsonSerializerSettings);
+            var controlData = JsonConvert.DeserializeObject<ClientSideCanvasControlData>(controlDataJson, jsonSerializerSettings);
 
             if (controlData.ControlType == 3)
             {
@@ -395,8 +392,10 @@ namespace OfficeDevPnP.Core.Pages
                 div = element;
             }
 
-            // By default text is wrapped in a Paragraph, need to drop it to avoid getting multiple paragraphs on page edits
-            if ((div.FirstChild as IElement).TagName.Equals("P", StringComparison.InvariantCultureIgnoreCase))
+            // By default simple plain text is wrapped in a Paragraph, need to drop it to avoid getting multiple paragraphs on page edits.
+            // Only drop the paragraph tag when there's only one Paragraph element underneath the DIV tag
+            if ((div.FirstChild as IElement).TagName.Equals("P", StringComparison.InvariantCultureIgnoreCase) &&
+                (div.ChildElementCount == 1))
             {
                 this.Text = (div.FirstChild as IElement).InnerHtml;
             }
